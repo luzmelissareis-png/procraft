@@ -1,0 +1,54 @@
+# Plumbing test (30 seconds): can this repository's workflows run, create a release with a file,
+# and report back to a branch? Safe to delete.
+name: Smoke test
+
+on:
+  push:
+    branches: [smoke]
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Runner
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          ls "$ANDROID_HOME" 2>&1 | head -20 || true
+          echo "-- ndk:"; ls "$ANDROID_HOME/ndk" 2>&1 | head || true
+          echo "-- build-tools:"; ls "$ANDROID_HOME/build-tools" 2>&1 | head || true
+          echo "-- platforms:"; ls "$ANDROID_HOME/platforms" 2>&1 | head || true
+          java -version 2>&1 | head -2
+          nproc; free -g | head -2; df -h / | tail -1
+          gh --version | head -1
+
+      - name: A release with a file
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          head -c 3000000 /dev/urandom >smoke.bin
+          sha256sum smoke.bin | tee smoke.sha256
+          tag="smoke-$GITHUB_RUN_NUMBER"
+          gh release create "$tag" --prerelease --target "$GITHUB_SHA" --title "smoke $GITHUB_RUN_NUMBER" \
+            --notes "plumbing test, safe to delete" smoke.bin smoke.sha256
+          gh release view "$tag" --json assets --jq '.assets[].name'
+
+      - name: Report to a branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          if ! gh api "repos/$GH_REPO/git/ref/heads/reports" >/dev/null 2>&1; then
+            gh api -X POST "repos/$GH_REPO/git/refs" -f ref=refs/heads/reports \
+              -f sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" >/dev/null
+          fi
+          printf 'smoke run %s finished at %s\nsha256 %s\n' "$GITHUB_RUN_NUMBER" "$(date -u +%FT%TZ)" "$(cut -d' ' -f1 smoke.sha256 2>/dev/null || echo none)" >report.txt
+          gh api -X PUT "repos/$GH_REPO/contents/reports/smoke-$GITHUB_RUN_NUMBER.txt" \
+            -f message="smoke report $GITHUB_RUN_NUMBER" -f branch=reports -f content="$(base64 -w0 report.txt)" >/dev/null
+          echo reported
