@@ -1145,8 +1145,8 @@ jobs:
           # run would make every APK a stranger to the last: to install it, the last would have to be uninstalled
           # first, and its artwork with it. So the key travels inside this file. It is a "debug" key, of the kind
           # that isn't secret: fine for a build of your own, not for one published for others.
-          mkdir -p "$HOME/.android"
-          tr -d '\r' <<'EOF' | base64 -d >"$HOME/.android/debug.keystore"
+          ks="$RUNNER_TEMP/procraft-fix.keystore"
+          tr -d '\r' <<'EOF' | base64 -d >"$ks"
           MIIKZgIBAzCCChAGCSqGSIb3DQEHAaCCCgEEggn9MIIJ+TCCBcAGCSqGSIb3DQEHAaCCBbEEggWt
           MIIFqTCCBaUGCyqGSIb3DQEMCgECoIIFQDCCBTwwZgYJKoZIhvcNAQUNMFkwOAYJKoZIhvcNAQUM
           MCsEFHlhZ0g2tDVaOoNQk2PNi9SEI6MFAgInEAIBIDAMBggqhkiG9w0CCQUAMB0GCWCGSAFlAwQB
@@ -1195,9 +1195,17 @@ jobs:
           uSgcUyn4OJN3Xj1l6l3yFIB2wtLCPTBNMDEwDQYJYIZIAWUDBAIBBQAEIGaCqVq/RoT5p2Pa5SBW
           omcPD7FZxyM6HNStuSoAVavoBBSznTxq5HCJhNZ7wI+qOqAMWj2qUAICJxA=
           EOF
-          got="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android | sed -n 's/^[[:space:]]*SHA256: //p' | tr -d ':' | tr 'A-F' 'a-f')"
+          got="$(keytool -list -v -keystore "$ks" -storepass android | sed -n 's/^[[:space:]]*SHA256: //p' | tr -d ':' | tr 'A-F' 'a-f')"
           echo "signing key (certificate SHA-256): $got"
           test "$got" = "$EXPECTED_CERT_SHA256"
+          # the build is given it the way the project's own release workflow gives its key (android/app/build.gradle.kts):
+          # a build left to find "the debug key" on its own made a new one, wherever it looked
+          {
+            echo "PROCRAFT_KEYSTORE=$ks"
+            echo "PROCRAFT_KEYSTORE_PASSWORD=android"
+            echo "PROCRAFT_KEY_ALIAS=androiddebugkey"
+            echo "PROCRAFT_KEY_PASSWORD=android"
+          } >>"$GITHUB_ENV"
 
       - name: Build
         working-directory: android
