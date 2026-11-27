@@ -5257,6 +5257,106 @@ class CanvasViewModel(app: Application) : AndroidViewModel(app) {
     fun librarySource(grain: Boolean, index: Int): ByteArray =
         io.github.artcraftandroid.procraft.core.sourceLibrary(grain).getOrNull(index)?.pixels ?: ByteArray(0)
 
+    // ── Procreate texture library ────────────────────────────────────────────
+
+    /** Names of the Procreate shape/grain PNG assets, in alphabetical order. */
+    private fun procreateAssetNames(grain: Boolean): List<String> {
+        val dir = if (grain) "procreate_textures/grains" else "procreate_textures/shapes"
+        return try {
+            getApplication<Application>().assets.list(dir)
+                ?.filter { it.endsWith(".png") }
+                ?.sorted()
+                ?: emptyList()
+        } catch (_: Throwable) { emptyList() }
+    }
+
+    /** Pretty name from an asset file name: strip path/suffix and dashes. */
+    private fun prettyTextureName(filename: String): String =
+        filename.removeSuffix(".png")
+            .replace("GL-", "")
+            .replace("Brush-Artery-", "")
+            .replace('-', ' ')
+
+    /** Decoded 1024×1024 L bitmap from a Procreate texture asset. */
+    private fun decodeProcreateAsset(grain: Boolean, filename: String): Bitmap? {
+        val dir = if (grain) "procreate_textures/grains" else "procreate_textures/shapes"
+        return try {
+            val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+            getApplication<Application>().assets.open("$dir/$filename").use { stream ->
+                BitmapFactory.decodeStream(stream, null, opts)
+            }
+        } catch (_: Throwable) { null }
+    }
+
+    /** Thumbnail bitmaps for the Procreate shape/grain library (name → 256-square grayscale). */
+    val procreateShapeLibrary: List<Pair<String, ImageBitmap?>> by lazy {
+        procreateAssetNames(false).map { f ->
+            val name = prettyTextureName(f)
+            val bmp = decodeProcreateAsset(false, f)?.let { src ->
+                val side = 256
+                val scaled = Bitmap.createScaledBitmap(src, side, side, true)
+                val argb = IntArray(side * side).also { scaled.getPixels(it, 0, side, 0, 0, side, side) }
+                Bitmap.createBitmap(argb.map { px ->
+                    val a = (px ushr 24) and 0xFF
+                    val g = if (a == 0) 0 else ((px ushr 16) and 0xFF)
+                    (0xFF shl 24) or (g shl 16) or (g shl 8) or g
+                }.toIntArray(), side, side, Bitmap.Config.ARGB_8888).asImageBitmap()
+            }
+            name to bmp
+        }
+    }
+    val procreateGrainLibrary: List<Pair<String, ImageBitmap?>> by lazy {
+        procreateAssetNames(true).map { f ->
+            val name = prettyTextureName(f)
+            val bmp = decodeProcreateAsset(true, f)?.let { src ->
+                val side = 256
+                val scaled = Bitmap.createScaledBitmap(src, side, side, true)
+                val argb = IntArray(side * side).also { scaled.getPixels(it, 0, side, 0, 0, side, side) }
+                Bitmap.createBitmap(argb.map { px ->
+                    val a = (px ushr 24) and 0xFF
+                    val g = if (a == 0) 0 else ((px ushr 16) and 0xFF)
+                    (0xFF shl 24) or (g shl 16) or (g shl 8) or g
+                }.toIntArray(), side, side, Bitmap.Config.ARGB_8888).asImageBitmap()
+            }
+            name to bmp
+        }
+    }
+
+    /**
+     * Full-resolution (1024×1024) pixels of Procreate texture [index] from the asset library,
+     * converted to the grayscale ByteArray the brush engine expects.  Returns empty on failure.
+     */
+    fun procreateLibrarySource(grain: Boolean, index: Int): ByteArray {
+        val filename = procreateAssetNames(grain).getOrNull(index) ?: return ByteArray(0)
+        val bmp = decodeProcreateAsset(grain, filename) ?: return ByteArray(0)
+        // convert ALPHA_8 (or any config) bitmap to flat grayscale bytes
+        val side = bmp.width.coerceAtMost(bmp.height)
+        val argb = IntArray(side * side)
+        bmp.getPixels(argb, 0, bmp.width, 0, 0, side, side)
+        val gray = ByteArray(side * side) { i ->
+            val px = argb[i]
+            val a = (px ushr 24) and 0xFF
+            if (a == 0) 0.toByte() else ((px ushr 16) and 0xFF).toByte()
+        }
+        // The engine's sourceFromPicture expects RGBA rows; re-encode as such
+        val rgba = ByteArray(side * side * 4) { i ->
+            val pi = i / 4; val g = gray[pi].toInt() and 0xFF
+            when (i % 4) { 0, 1, 2 -> g.toByte(); else -> 0xFF.toByte() }
+        }
+        return io.github.artcraftandroid.procraft.core.sourceFromPicture(rgba, side.toUInt(), side.toUInt())
+    }
+
+    /** Paired shape/grain names for the GL-* Procreate family (Shape-index, Grain-index). */
+    val procreateTexturePairs: List<Triple<String, Int, Int?>> by lazy {
+        val shapeNames = procreateAssetNames(false).map { prettyTextureName(it) }
+        val grainNames = procreateAssetNames(true).map { prettyTextureName(it) }
+        shapeNames.mapIndexed { si, sn ->
+            val base = sn.replace(" Shape", "")
+            val gi = grainNames.indexOfFirst { it.replace(" Grain", "") == base }.takeIf { it >= 0 }
+            Triple(base, si, gi)
+        }
+    }
+
     /** [bitmap] fitted into the square on black, by its lightness (the shared core's). */
     private fun sourceFrom(bitmap: Bitmap): ByteArray {
         val (w, h) = bitmap.width to bitmap.height

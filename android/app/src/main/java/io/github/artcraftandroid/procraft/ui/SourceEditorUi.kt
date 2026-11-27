@@ -206,6 +206,13 @@ fun SourceEditor(vm: CanvasViewModel) {
                 image = vm.librarySource(grain, i)
                 shipped = vm.shippedOf(grain, i)
                 library = false
+            }, onPickProcreate = { i ->
+                val pixels = vm.procreateLibrarySource(grain, i)
+                if (pixels.isNotEmpty()) {
+                    image = pixels
+                    shipped = null
+                }
+                library = false
             }) { library = false }
         }
     }
@@ -337,18 +344,33 @@ private fun SimpleSlider(value: Float, onChange: (Float) -> Unit, modifier: Modi
     }
 }
 
+/** Which tab the source library is showing. */
+private enum class LibraryTab { SHIPPED, PROCREATE }
+
 /**
- * The source library: a sheet (580 x 575, 74 down) over the editor with its title and Cancel, Shape
- * Source and Grain Source with a search by name, then the shipped images three across (147 square,
- * their names under them). A pick of the other kind than the one being edited isn't taken.
+ * The source library: a sheet (580 x 575, 74 down) over the editor with its title and Cancel.
+ * Two rows of tabs:
+ *   Row 1 — "Shape Source" / "Grain Source" (which kind to browse)
+ *   Row 2 — "Built-in" / "Procreate" (which set)
+ * A pick of the other kind than the one being edited isn't taken.
  */
 @Composable
-private fun SourceLibrary(vm: CanvasViewModel, grain: Boolean, onPick: (Int) -> Unit, onCancel: () -> Unit) {
+private fun SourceLibrary(
+    vm: CanvasViewModel,
+    grain: Boolean,
+    onPick: (Int) -> Unit,
+    onPickProcreate: (Int) -> Unit,
+    onCancel: () -> Unit,
+) {
     var showGrains by remember { mutableStateOf(grain) }
+    var tab by remember { mutableStateOf(LibraryTab.SHIPPED) }
     var query by remember { mutableStateOf("") }
-    val all: List<Pair<String, ImageBitmap?>> = if (showGrains) vm.grainLibrary else vm.shapeLibrary
+
+    val shippedList: List<Pair<String, ImageBitmap?>> = if (showGrains) vm.grainLibrary else vm.shapeLibrary
+    val procreateList: List<Pair<String, ImageBitmap?>> = if (showGrains) vm.procreateGrainLibrary else vm.procreateShapeLibrary
+    val all: List<Pair<String, ImageBitmap?>> = if (tab == LibraryTab.SHIPPED) shippedList else procreateList
     val shown = all.withIndex().filter { query.isBlank() || it.value.first.contains(query.trim(), ignoreCase = true) }
-    // over the whole window, the studio's pages dimmed too, the sheet in the window's middle
+
     val atOrigin = remember {
         object : androidx.compose.ui.window.PopupPositionProvider {
             override fun calculatePosition(
@@ -362,25 +384,46 @@ private fun SourceLibrary(vm: CanvasViewModel, grain: Boolean, onPick: (Int) -> 
     PcPopup(atOrigin, onDismissRequest = onCancel, properties = PopupProperties(focusable = true, clippingEnabled = false)) {
     Box(Modifier.fillMaxSize().background(LibraryVeil).pointerInput(Unit) { awaitEachGesture { awaitFirstDown().consume() } }) {
         Column(
-            Modifier.align(Alignment.TopCenter).offset(y = 74.dp).size(580.dp, 575.dp).clip(RoundedCornerShape(26.dp)).background(LibrarySheet)
+            Modifier.align(Alignment.TopCenter).offset(y = 74.dp).size(580.dp, 610.dp).clip(RoundedCornerShape(26.dp)).background(LibrarySheet)
                 .pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } },
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 19.dp, end = 19.dp, top = 69.dp).height(39.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(start = 19.dp, end = 19.dp, top = 25.dp).height(39.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Source Library", color = LibraryTitle, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
                 Text("Cancel", color = LibraryDim, fontSize = 17.sp, maxLines = 1, modifier = Modifier.tap(onCancel))
             }
-            Row(Modifier.padding(start = 43.dp, top = 25.dp).height(45.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Row 1: Shape / Grain kind selector
+            Row(Modifier.padding(start = 43.dp, top = 16.dp).height(41.dp), verticalAlignment = Alignment.CenterVertically) {
                 for ((label, isGrain) in listOf("Shape Source" to false, "Grain Source" to true)) {
                     Box(Modifier.padding(end = 11.dp).size(115.dp, 41.dp).tap { showGrains = isGrain }, contentAlignment = Alignment.Center) {
                         Text(label, color = if (showGrains == isGrain) Pc.MenuInk else LibraryDim, fontSize = 17.sp, maxLines = 1)
                     }
                 }
-                Spacer(Modifier.width(8.dp))
+            }
+            // Row 2: Built-in / Procreate set selector + search
+            Row(Modifier.padding(start = 19.dp, top = 10.dp, bottom = 6.dp).height(41.dp), verticalAlignment = Alignment.CenterVertically) {
+                // set tabs as a small segmented control
+                Row(
+                    Modifier.height(36.dp).clip(RoundedCornerShape(18.dp)).background(LibrarySearchFill).border(1.dp, LibrarySearchEdge, RoundedCornerShape(18.dp)),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    for ((label, t) in listOf("Built-in" to LibraryTab.SHIPPED, "Procreate" to LibraryTab.PROCREATE)) {
+                        val active = tab == t
+                        Box(
+                            Modifier.height(36.dp).clip(RoundedCornerShape(18.dp))
+                                .background(if (active) Pc.Accent else Color.Transparent)
+                                .tap { tab = t }.padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(label, color = if (active) Color.White else LibraryHint, fontSize = 15.sp, maxLines = 1)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
                 LibrarySearch(query) { query = it }
             }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(53.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -388,14 +431,18 @@ private fun SourceLibrary(vm: CanvasViewModel, grain: Boolean, onPick: (Int) -> 
                 items(shown.size) { k ->
                     val (i, item) = shown[k]
                     val (name, image) = item
+                    // shape = white on black; grain = greyscale on black
+                    val imageModifier = Modifier.fillMaxSize()
                     Column(
                         Modifier.width(147.dp).tap {
                             // each kind takes its own: a grain picked in the shape editor is not taken
-                            if (showGrains == grain) onPick(i)
+                            if (showGrains == grain) {
+                                if (tab == LibraryTab.SHIPPED) onPick(i) else onPickProcreate(i)
+                            }
                         },
                     ) {
                         Box(Modifier.size(147.dp, 146.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, LibraryEdge, RoundedCornerShape(8.dp))) {
-                            image?.let { Image(it, contentDescription = name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                            image?.let { Image(it, contentDescription = name, contentScale = ContentScale.Crop, modifier = imageModifier) }
                         }
                         Text(name, color = LibraryTitle, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(start = 3.dp, top = 5.dp).height(21.dp))
                     }
