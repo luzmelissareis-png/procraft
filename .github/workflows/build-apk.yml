@@ -35,7 +35,7 @@ env:
   RUST_VERSION: "1.99.0"
   NDK_VERSION: "29.0.14206865"
   UPSTREAM_COMMIT: 7f73ab17fabe2b4a536a564c1dbdc702833ee407
-  BUILD_LABEL: "brush-compat"
+  BUILD_LABEL: "procreate-textures"
   EXPECTED_CERT_SHA256: "ca1e7af846363446559d3b9d5b23a381ebcabf63668288b6d8d1ce02af11c492"
   VARIANT: ${{ inputs.variant || (endsWith(github.ref_name, '-debug') && 'debug' || 'release') }}
 
@@ -2264,12 +2264,87 @@ jobs:
           oAkEUbO13vGti0f6B5gEGtOjS/cBsUBcnS9EKPgY1bc1V22Ho11TSEwZ2fgf2MoXWLTKAwA=
           EOF
           # a pasted copy that lost or changed a character would not match these
+          tr -d '\r' <<'EOF' | base64 -d | gunzip >"$d/6-procreate-texture-library.patch"
+          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
+          EOF
           tr -d '\r' <<'EOF' | (cd "$d" && sha256sum -c)
           0f5fdd481f886c3367ee5094f76cbb1648f2631f10ec2f0e4e6c60e860a7a7e4  1-memory-fix-and-photo-import.patch
           08c8a9557c1f25f96bbc55458ccdbbead1385bed787978528ae2124589bf518e  2-side-by-side-install.patch
           9aa5ef81f7f926453d74dfa822f62ca124bfe2496af9a116f60bb245a9ca93db  3-brush-import-reports.patch
           a2c035c8b62b986806685f2e8668c06766650715de2140fd0aaa66052ad7b1b4  4-big-canvas-memory-bounds.patch
           73856836d5494dcafc3c932aeb079d34d73b9a6e82a6a6ea784e831de2a0c7d6  5-procreate-compat-and-supplied-pictures.patch
+          0aad7b32e03912e2e77bd2d55cb48579e1093f9086ad4afcaca96ffb526c389e  6-procreate-texture-library.patch
           EOF
           for p in "$d"/*.patch; do
             echo "== $p"
@@ -2277,6 +2352,26 @@ jobs:
             git apply --whitespace=nowarn "$p"
           done
           git status --short
+
+      - name: Copy Procreate texture assets from fork
+        run: |
+          # Fetch the PNG texture assets from luzmelissareis-png/procraft@procreate-textures-library
+          FORK_REPO="https://github.com/luzmelissareis-png/procraft"
+          BRANCH="procreate-textures-library"
+          ASSET_DIR="android/app/src/main/assets/procreate_textures"
+          mkdir -p "$ASSET_DIR/shapes" "$ASSET_DIR/grains"
+          # Use the GitHub API to list and download each asset
+          for sub in shapes grains; do
+            api_url="https://api.github.com/repos/luzmelissareis-png/procraft/contents/$ASSET_DIR/$sub?ref=$BRANCH"
+            files=$(curl -sf "$api_url" | python3 -c "import sys,json; [print(f['download_url'],f['name']) for f in json.load(sys.stdin) if f['name'].endswith('.png')]")
+            while IFS=' ' read -r url name; do
+              [ -z "$url" ] && continue
+              curl -sfL "$url" -o "$ASSET_DIR/$sub/$name"
+              echo "  fetched $sub/$name"
+            done <<< "$files"
+          done
+          echo "Procreate texture assets:"
+          find "$ASSET_DIR" -name "*.png" | sort
 
       - id: v
         name: Version
@@ -2434,7 +2529,7 @@ jobs:
           tag="fix-build-$GITHUB_RUN_NUMBER-$VARIANT"
           gh release create "$tag" --prerelease --target "$GITHUB_SHA" \
             --title "ProCraft fix $VERSION ($VARIANT build $GITHUB_RUN_NUMBER)" \
-            --notes "Tap the .apk below on your phone to download it, then open it to install. It appears as ProCraft fix 2, next to your ProCraft. Every later build signed with this same key installs over it as an update. Built from upstream ProCraft ${UPSTREAM_COMMIT::7} with the memory fixes, the Procreate brush-import reports, the big-canvas memory bounds, Procreate compatibility fidelity and a way to supply the pictures a brush set lacks ($BUILD_LABEL); signed with a fixed debug key (certificate SHA-256 $EXPECTED_CERT_SHA256)." \
+            --notes "Tap the .apk below on your phone to download it, then open it to install. It appears as ProCraft fix 2, next to your ProCraft. Every later build signed with this same key installs over it as an update. Built from upstream ProCraft ${UPSTREAM_COMMIT::7} with the memory fixes, the Procreate brush-import reports, the big-canvas memory bounds, Procreate compatibility fidelity, a way to supply the pictures a brush set lacks, and the Procreate GL-* texture library in the brush editor (10 shapes + 9 grains, $BUILD_LABEL); signed with a fixed debug key (certificate SHA-256 $EXPECTED_CERT_SHA256)." \
             dist/*
 
       - name: Keep the build log
