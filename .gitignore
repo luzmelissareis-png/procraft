@@ -1,0 +1,8 @@
+# Build outputs
+android/
+target/
+*.apk
+*.aab
+build/
+.gradle/
+local.properties
